@@ -1,9 +1,22 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from mlp import SimpleMLP
 from sinx_dataset import SinxDataset
 from matplotlib import pyplot as plt
+import argparse
+import os
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Training parameters for MLP.")
+    parser.add_argument('--epoches', type=int, default=100, help='Number of training epochs.')
+    parser.add_argument('--batch_size', type=int, default=64, help='Batch size for training.')
+    parser.add_argument('--lr', type=float, default=1e-3, help='Learning rate for optimizer.')
+    parser.add_argument('--log_dir', type=str, default='./log', help='Logging directory.')
+
+    return parser.parse_args()
 
 if __name__ == '__main__':
     # problem settings
@@ -11,21 +24,24 @@ if __name__ == '__main__':
     x_right = 5
 
     # training params
-    epoches = 100
-    batch_size = 64
-    lr = 1e-3
+    args = parse_args()
 
     # setup
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     mlp = SimpleMLP(1, 1, 256, 4).to(device)
     dataset = SinxDataset(x_left, x_right)
-    dataloader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True, sampler=None)
+    dataloader = DataLoader(dataset=dataset, batch_size=args.batch_size, shuffle=True, sampler=None)
     loss_fn = nn.HuberLoss()
-    optimizer = torch.optim.Adam(params=mlp.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(params=mlp.parameters(), lr=args.lr)
+
+    # tensorboard
+    if not os.path.isdir(args.log_dir):
+        os.makedirs(args.log_dir, exist_ok=True)
+    writer = SummaryWriter(log_dir=args.log_dir)
 
     # train
     mlp.train()
-    for epoch in range(epoches):
+    for epoch in range(args.epoches):
         for batch, (x, y) in enumerate(dataloader):
             x, y = x.to(device), y.to(device)
             y_pred = mlp(x)
@@ -33,10 +49,11 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-
+            writer.add_scalar('Training Loss', loss.item(), epoch * len(dataloader) + batch)
             if batch % 10 == 0:
-                loss, current = loss.item(), batch * batch_size + len(x)
+                loss, current = loss.item(), batch * args.batch_size + len(x)
                 print(f"loss: {loss:>7f}  [{epoch:>2d}: {current:>4d}/{len(dataset):>4d}]")
+    writer.close()
 
     # eval
     mlp = mlp.to('cpu')
