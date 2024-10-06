@@ -26,5 +26,15 @@ You could learn:
 
 You could learn:
 
-## 04. 
+* What is lr_scheduler
+* How to use common lr_scheduler s
+* How to write a customized lr_scheduler
+
+## 04. Autograd
+
+
+## 05. Mixed Precision Training
+
+
+## 06. Compute Graph, ONNX and Netron
 
